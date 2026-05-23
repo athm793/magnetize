@@ -21,6 +21,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const body = await req.json();
 
+  // Verify ownership before any tab/gate mutation
+  if (body.action) {
+    const owned = await getMagnetById(id, session.user.id);
+    if (!owned) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   // Handle tab operations
   if (body.action === "createTab") {
     const tabs = await getTabsByMagnet(id);

@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { getMagnetById } from "@/lib/db/queries/magnets";
 import { getTabsByMagnet } from "@/lib/db/queries/tabs";
 import { notFound, redirect } from "next/navigation";
+import { hasAI } from "@/lib/ai";
 import MagnetEditor from "@/components/editor/MagnetEditor";
 import Link from "next/link";
 import { ArrowLeft, BarChart2, Settings } from "lucide-react";
@@ -47,7 +48,7 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
           </Link>
         </div>
       </div>
-      <MagnetEditor magnet={magnet} tabs={tabs} />
+      <MagnetEditor magnet={magnet} tabs={tabs} hasAI={hasAI} />
     </div>
   );
 }

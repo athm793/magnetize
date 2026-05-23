@@ -30,7 +30,12 @@ export default function SignupPage() {
       setLoading(false);
       return;
     }
-    await signIn("credentials", { email, password, redirect: false });
+    const signInRes = await signIn("credentials", { email, password, redirect: false });
+    if (signInRes?.error) {
+      toast.error("Account created but sign-in failed. Please log in.");
+      setLoading(false);
+      return;
+    }
     router.push("/dashboard");
   }
 

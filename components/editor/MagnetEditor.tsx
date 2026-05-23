@@ -15,9 +15,10 @@ import type { LeadMagnet } from "@/lib/db/queries/magnets";
 interface Props {
   magnet: LeadMagnet;
   tabs: Tab[];
+  hasAI?: boolean;
 }
 
-export default function MagnetEditor({ magnet, tabs: initialTabs }: Props) {
+export default function MagnetEditor({ magnet, tabs: initialTabs, hasAI }: Props) {
   const [tabs, setTabs] = useState<Tab[]>(initialTabs);
   const [activeTabId, setActiveTabId] = useState<string>(initialTabs[0]?.id ?? "");
   const [magnetTitle, setMagnetTitle] = useState(magnet.title);
@@ -141,7 +142,8 @@ export default function MagnetEditor({ magnet, tabs: initialTabs }: Props) {
         buffer = lines.pop() ?? "";
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
-          const payload = JSON.parse(line.slice(6));
+          let payload: { done?: boolean; tabs?: { title: string; content: unknown[] }[]; chunk?: string; error?: string };
+          try { payload = JSON.parse(line.slice(6)); } catch { continue; }
           if (payload.done && payload.tabs) {
             // Replace all tabs with generated ones
             const generatedTabs = payload.tabs as { title: string; content: unknown[] }[];
@@ -194,7 +196,7 @@ export default function MagnetEditor({ magnet, tabs: initialTabs }: Props) {
         />
         <Badge variant={status === "published" ? "default" : "secondary"} className="text-xs">{status}</Badge>
         <div className="flex-1" />
-        {process.env.NEXT_PUBLIC_OPENROUTER_KEY !== undefined && (
+        {hasAI && (
           <Button variant="outline" size="sm" onClick={() => setAiOpen(!aiOpen)} className="text-violet-600 border-violet-200 hover:bg-violet-50">
             <Sparkles className="w-3.5 h-3.5 mr-1.5" />
             Generate with AI

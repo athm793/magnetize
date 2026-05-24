@@ -216,7 +216,7 @@
   background-size: 60px 60px;
 }
 
-/* ── Magnetic button ── */
+/* ── Magnetic button (cyan — auth pages) ── */
 .btn-magnetic {
   background: linear-gradient(135deg, #0ea5e9 0%, #00c8ff 100%);
   color: #020b18;
@@ -224,7 +224,7 @@
   border: none;
   position: relative;
   overflow: hidden;
-  transition: all 0.2s;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .btn-magnetic::after {
   content: '';
@@ -234,23 +234,117 @@
   pointer-events: none;
 }
 .btn-magnetic:hover {
-  box-shadow: 0 0 30px rgba(0, 200, 255, 0.4), 0 4px 20px rgba(0, 200, 255, 0.3);
-  transform: translateY(-1px);
+  box-shadow: 0 0 32px rgba(0, 200, 255, 0.45), 0 6px 24px rgba(0, 200, 255, 0.3);
+  transform: translateY(-2px);
 }
 
+/* ── North button (blue — primary CTAs) ── */
+.btn-north {
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 55%, #3b82f6 100%);
+  color: white;
+  font-weight: 700;
+  border: none;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-north::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.14) 0%, transparent 55%);
+  pointer-events: none;
+}
+.btn-north:hover {
+  box-shadow: 0 0 40px rgba(59, 130, 246, 0.6), 0 8px 32px rgba(59, 130, 246, 0.4);
+  transform: translateY(-2px);
+}
+
+/* ── North/South card variants ── */
+.mag-card-n {
+  background: rgba(4, 15, 30, 0.82);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  backdrop-filter: blur(18px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.mag-card-n:hover {
+  border-color: rgba(59, 130, 246, 0.52);
+  box-shadow:
+    0 0 36px rgba(59, 130, 246, 0.16),
+    0 0 80px rgba(59, 130, 246, 0.06),
+    inset 0 1px 0 rgba(59, 130, 246, 0.1);
+  transform: translateY(-5px);
+}
+.mag-card-s {
+  background: rgba(22, 4, 4, 0.82);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  backdrop-filter: blur(18px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.mag-card-s:hover {
+  border-color: rgba(239, 68, 68, 0.52);
+  box-shadow:
+    0 0 36px rgba(239, 68, 68, 0.16),
+    0 0 80px rgba(239, 68, 68, 0.06),
+    inset 0 1px 0 rgba(239, 68, 68, 0.1);
+  transform: translateY(-5px);
+}
+
+/* ── Pole-specific text gradients ── */
+.text-north {
+  background: linear-gradient(135deg, #93c5fd 0%, #3b82f6 50%, #1d4ed8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.text-south {
+  background: linear-gradient(135deg, #fca5a5 0%, #ef4444 50%, #b91c1c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.text-poles {
+  background: linear-gradient(95deg, #3b82f6 0%, #818cf8 38%, #c084fc 62%, #ef4444 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Scroll reveal ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 0.65s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-d1 { transition-delay: 0.08s; }
+.reveal-d2 { transition-delay: 0.18s; }
+.reveal-d3 { transition-delay: 0.28s; }
+.reveal-d4 { transition-delay: 0.38s; }
+.reveal-d5 { transition-delay: 0.48s; }
+.reveal-d6 { transition-delay: 0.58s; }
+
+/* ── Keyframes ── */
 @keyframes field-pulse {
   0%, 100% { opacity: 0.4; transform: scale(1); }
   50% { opacity: 0.7; transform: scale(1.02); }
 }
 .animate-field-pulse { animation: field-pulse 3s ease-in-out infinite; }
 
-@keyframes flow {
-  0% { stroke-dashoffset: 100; }
-  100% { stroke-dashoffset: 0; }
-}
-
 @keyframes mag-float {
   0%, 100% { transform: translateY(0px); }
   50% { transform: translateY(-6px); }
 }
 .animate-mag-float { animation: mag-float 4s ease-in-out infinite; }
+
+@keyframes ping-slow {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2); opacity: 0; }
+}
+.animate-ping-slow { animation: ping-slow 2.4s ease-out infinite; }

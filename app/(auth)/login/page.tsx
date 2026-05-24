@@ -7,13 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Zap } from "lucide-react";
+import { Zap, Mail, Lock } from "lucide-react";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const raw = searchParams.get("callbackUrl") ?? "/dashboard";
   const callbackUrl = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/dashboard";
+
+  const [tab, setTab] = useState<"password" | "code">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -27,6 +29,23 @@ function LoginForm() {
       toast.error("Invalid email or password");
     } else {
       router.push(callbackUrl);
+    }
+  }
+
+  async function handleSendCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email) { toast.error("Enter your email"); return; }
+    setLoading(true);
+    const res = await fetch("/api/auth/otp/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    setLoading(false);
+    if (!res.ok) {
+      toast.error("Failed to send code. Try again.");
+    } else {
+      router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
     }
   }
 
@@ -49,26 +68,71 @@ function LoginForm() {
         Continue with Google
       </Button>
 
-      <div className="relative mb-4">
+      <div className="relative mb-5">
         <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
         <div className="relative flex justify-center text-xs uppercase">
           <span className="bg-white px-2 text-gray-400">or</span>
         </div>
       </div>
 
-      <form onSubmit={handleCredentials} className="space-y-4">
-        <div>
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required />
-        </div>
-        <div>
-          <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
-        </div>
-        <Button type="submit" className="w-full bg-violet-600 hover:bg-violet-700" disabled={loading}>
-          {loading ? "Signing in…" : "Sign in"}
-        </Button>
-      </form>
+      {/* Tab switcher */}
+      <div className="flex bg-gray-100 rounded-lg p-1 mb-5">
+        <button
+          onClick={() => setTab("password")}
+          className={`flex-1 flex items-center justify-center gap-1.5 text-sm py-1.5 rounded-md font-medium transition-all ${
+            tab === "password" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          <Lock className="w-3.5 h-3.5" />
+          Password
+        </button>
+        <button
+          onClick={() => setTab("code")}
+          className={`flex-1 flex items-center justify-center gap-1.5 text-sm py-1.5 rounded-md font-medium transition-all ${
+            tab === "code" ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          <Mail className="w-3.5 h-3.5" />
+          Email code
+        </button>
+      </div>
+
+      {tab === "password" ? (
+        <form onSubmit={handleCredentials} className="space-y-4">
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required />
+          </div>
+          <div>
+            <Label htmlFor="password">Password</Label>
+            <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+          </div>
+          <Button type="submit" className="w-full bg-violet-600 hover:bg-violet-700" disabled={loading}>
+            {loading ? "Signing in…" : "Sign in"}
+          </Button>
+        </form>
+      ) : (
+        <form onSubmit={handleSendCode} className="space-y-4">
+          <div>
+            <Label htmlFor="email-code">Email</Label>
+            <Input
+              id="email-code"
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@company.com"
+              required
+              autoFocus
+            />
+          </div>
+          <Button type="submit" className="w-full bg-violet-600 hover:bg-violet-700" disabled={loading}>
+            {loading ? "Sending code…" : "Send login code"}
+          </Button>
+          <p className="text-xs text-center text-gray-400">
+            We&apos;ll email you a 6-digit code. No password needed.
+          </p>
+        </form>
+      )}
     </div>
   );
 }

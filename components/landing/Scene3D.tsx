@@ -10,6 +10,7 @@ function dipoleField(x: number, y: number, z: number): THREE.Vector3 {
   return new THREE.Vector3((3 * x * y) / r5, (3 * y * y - r2) / r5, (3 * z * y) / r5);
 }
 
+// Trace from N pole toward S (standard direction)
 function traceFieldLine(x0: number, y0: number, z0: number, poleY: number): THREE.Vector3[] {
   const pts: THREE.Vector3[] = [];
   let x = x0, y = y0, z = z0;
@@ -24,6 +25,27 @@ function traceFieldLine(x0: number, y0: number, z0: number, poleY: number): THRE
     z += (b.z / len) * dt;
     if (x * x + y * y + z * z > 90) break;
     if (y < -poleY && x * x + z * z < 0.22) break;
+  }
+  return pts;
+}
+
+// Trace from S pole exterior toward N pole.
+// The dipole B field points toward N even at the S pole exterior,
+// so tracing forward from near S naturally arcs up to N.
+function traceFieldLineSouth(x0: number, y0: number, z0: number, poleY: number): THREE.Vector3[] {
+  const pts: THREE.Vector3[] = [];
+  let x = x0, y = y0, z = z0;
+  for (let i = 0; i < 500; i++) {
+    pts.push(new THREE.Vector3(x, y, z));
+    const b = dipoleField(x, y, z);
+    const len = b.length();
+    if (len < 0.00001) break;
+    const dt = 0.042;
+    x += (b.x / len) * dt;
+    y += (b.y / len) * dt;
+    z += (b.z / len) * dt;
+    if (x * x + y * y + z * z > 90) break;
+    if (y > poleY && x * x + z * z < 0.22) break; // reached N pole
   }
   return pts;
 }
@@ -221,16 +243,21 @@ export default function Scene3D() {
     const N_AZ = 12;
     const ELEVATIONS = [24, 50, 72];
     const R_START = 0.45;
-    const ELEV_COLORS = [0x00e5ff, 0x38bdf8, 0x1d4ed8];
-    const ELEV_OPACITIES = [0.82, 0.48, 0.22];
+
+    // N-pole lines: cyan → blue
+    const N_COLORS = [0x00e5ff, 0x38bdf8, 0x1d4ed8];
+    const N_OPACITIES = [0.82, 0.48, 0.22];
+    // S-pole lines: orange → red
+    const S_COLORS = [0xff7043, 0xef4444, 0x991b1b];
+    const S_OPACITIES = [0.80, 0.46, 0.20];
 
     const fieldLineCurves: THREE.CatmullRomCurve3[] = [];
 
+    // ── N-pole lines (emerge from left / blue side) ────────────────────
     for (let az = 0; az < N_AZ; az++) {
       const phi = (az / N_AZ) * Math.PI * 2;
       for (let ei = 0; ei < ELEVATIONS.length; ei++) {
         const theta = (ELEVATIONS[ei] * Math.PI) / 180;
-        // Start near N pole in base coords (+Y axis)
         const x0 = R_START * Math.sin(theta) * Math.cos(phi);
         const y0 = POLE + R_START * Math.cos(theta);
         const z0 = R_START * Math.sin(theta) * Math.sin(phi);
@@ -238,23 +265,49 @@ export default function Scene3D() {
         const rawPts = traceFieldLine(x0, y0, z0, POLE);
         if (rawPts.length < 8) continue;
 
-        // Apply rotZ to all points → N now on left (-X), S on right (+X)
         const pts = rawPts.map(rotZ);
         const curve = new THREE.CatmullRomCurve3(pts);
         fieldLineCurves.push(curve);
 
-        const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(130));
-        world.add(
-          new THREE.Line(geo, new THREE.LineBasicMaterial({
-            color: ELEV_COLORS[ei],
-            transparent: true,
-            opacity: ELEV_OPACITIES[ei],
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-          })),
-        );
+        world.add(new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(curve.getPoints(130)),
+          new THREE.LineBasicMaterial({
+            color: N_COLORS[ei], transparent: true, opacity: N_OPACITIES[ei],
+            blending: THREE.AdditiveBlending, depthWrite: false,
+          }),
+        ));
       }
     }
+
+    // ── S-pole lines (emerge from right / red side) ────────────────────
+    for (let az = 0; az < N_AZ; az++) {
+      const phi = (az / N_AZ) * Math.PI * 2;
+      for (let ei = 0; ei < ELEVATIONS.length; ei++) {
+        const theta = (ELEVATIONS[ei] * Math.PI) / 180;
+        // Start just outside S pole in base coords (-Y axis)
+        const x0 = R_START * Math.sin(theta) * Math.cos(phi);
+        const y0 = -(POLE + R_START * Math.cos(theta));
+        const z0 = R_START * Math.sin(theta) * Math.sin(phi);
+
+        const rawPts = traceFieldLineSouth(x0, y0, z0, POLE);
+        if (rawPts.length < 8) continue;
+
+        const pts = rawPts.map(rotZ);
+        const curve = new THREE.CatmullRomCurve3(pts);
+        fieldLineCurves.push(curve); // add to curves → particles flow on these too
+
+        world.add(new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(curve.getPoints(130)),
+          new THREE.LineBasicMaterial({
+            color: S_COLORS[ei], transparent: true, opacity: S_OPACITIES[ei],
+            blending: THREE.AdditiveBlending, depthWrite: false,
+          }),
+        ));
+      }
+    }
+
+    // Track how many N-pole curves came first (for particle coloring)
+    const nLineCurveCount = fieldLineCurves.length / 2;
 
     // ── Flow particles ─────────────────────────────────────────────────
     const PER_LINE = 9;
@@ -263,10 +316,19 @@ export default function Scene3D() {
     const flowCols = new Float32Array(totalFlow * 3);
 
     for (let i = 0; i < totalFlow; i++) {
+      const lineIdx = Math.floor(i / PER_LINE);
       const t = Math.random();
-      flowCols[i * 3]     = 0.25 + t * 0.75;
-      flowCols[i * 3 + 1] = 0.72 + t * 0.28;
-      flowCols[i * 3 + 2] = 1.0;
+      if (lineIdx < nLineCurveCount) {
+        // N-pole curves → cyan/blue particles
+        flowCols[i * 3]     = 0.25 + t * 0.75;
+        flowCols[i * 3 + 1] = 0.72 + t * 0.28;
+        flowCols[i * 3 + 2] = 1.0;
+      } else {
+        // S-pole curves → red/orange particles
+        flowCols[i * 3]     = 1.0;
+        flowCols[i * 3 + 1] = 0.18 + t * 0.32;
+        flowCols[i * 3 + 2] = 0.05 + t * 0.1;
+      }
     }
 
     const flowGeo = new THREE.BufferGeometry();

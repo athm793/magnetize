@@ -3,10 +3,21 @@ import { Suspense, useState, useEffect, useRef } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Zap, ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
+
+function MagnetLogo() {
+  return (
+    <Link href="/" className="flex items-center gap-2.5">
+      <div className="flex items-center h-8 rounded-lg overflow-hidden" style={{ boxShadow: "0 0 14px rgba(0,200,255,0.3)" }}>
+        <div className="flex items-center justify-center px-2.5 h-full text-white text-xs font-black tracking-wider" style={{ background: "linear-gradient(135deg,#1d4ed8,#3b82f6)" }}>N</div>
+        <div className="w-px h-full" style={{ background: "rgba(255,255,255,0.25)" }} />
+        <div className="flex items-center justify-center px-2.5 h-full text-white text-xs font-black tracking-wider" style={{ background: "linear-gradient(135deg,#b91c1c,#ef4444)" }}>S</div>
+      </div>
+      <span className="font-bold text-lg" style={{ color: "#e8f4ff" }}>Magnetize</span>
+    </Link>
+  );
+}
 
 function VerifyForm() {
   const router = useRouter();
@@ -20,8 +31,8 @@ function VerifyForm() {
 
   useEffect(() => {
     inputRef.current?.focus();
-    const timer = setInterval(() => setCountdown(c => Math.max(0, c - 1)), 1000);
-    return () => clearInterval(timer);
+    const t = setInterval(() => setCountdown(c => Math.max(0, c - 1)), 1000);
+    return () => clearInterval(t);
   }, []);
 
   async function handleVerify(e: React.FormEvent) {
@@ -48,61 +59,74 @@ function VerifyForm() {
       body: JSON.stringify({ email }),
     });
     setResending(false);
-    if (res.ok) {
-      toast.success("New code sent!");
-      setCountdown(60);
-      setCode("");
-      inputRef.current?.focus();
-    } else {
-      toast.error("Failed to resend code");
-    }
+    if (res.ok) { toast.success("New code sent!"); setCountdown(60); setCode(""); inputRef.current?.focus(); }
+    else toast.error("Failed to resend");
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+    <div className="rounded-2xl p-8" style={{ background: "rgba(4,17,31,0.85)", border: "1px solid rgba(0,200,255,0.12)", backdropFilter: "blur(16px)" }}>
       <div className="text-center mb-6">
-        <div className="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center mx-auto mb-3">
-          <Zap className="w-6 h-6 text-violet-600" />
+        {/* Magnetic icon for OTP */}
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+          style={{ background: "rgba(0,200,255,0.08)", border: "1px solid rgba(0,200,255,0.2)" }}>
+          <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7" stroke="#00c8ff" strokeWidth="1.5">
+            <path d="M12 2a7 7 0 0 1 7 7c0 3.866-3.134 7-7 7a7 7 0 0 1-7-7 7 7 0 0 1 7-7z" strokeDasharray="4 2" />
+            <path d="M12 6v2M12 10v2" strokeLinecap="round" />
+            <path d="M8 20h8M10 17v3M14 17v3" strokeLinecap="round" />
+          </svg>
         </div>
-        <h1 className="text-2xl font-semibold mb-1">Check your email</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-xl font-bold mb-1" style={{ color: "#e8f4ff" }}>Check your email</h1>
+        <p className="text-sm" style={{ color: "#475569" }}>
           We sent a 6-digit code to<br />
-          <span className="font-medium text-gray-700">{email}</span>
+          <span className="font-semibold" style={{ color: "#94a3b8" }}>{email}</span>
         </p>
       </div>
 
       <form onSubmit={handleVerify} className="space-y-4">
-        <Input
+        <input
           ref={inputRef}
           value={code}
           onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
           placeholder="000000"
           maxLength={6}
-          className="text-center text-2xl font-bold tracking-[0.5em] h-14"
           inputMode="numeric"
           autoComplete="one-time-code"
+          className="w-full text-center text-3xl font-black tracking-[0.6em] py-4 rounded-xl outline-none transition-all"
+          style={{
+            background: "rgba(0,200,255,0.04)",
+            border: "1px solid rgba(0,200,255,0.2)",
+            color: "#00c8ff",
+            caretColor: "#00c8ff",
+            letterSpacing: "0.6em",
+            paddingLeft: "0.6em",
+          }}
+          onFocus={e => { e.target.style.borderColor = "rgba(0,200,255,0.55)"; e.target.style.boxShadow = "0 0 0 3px rgba(0,200,255,0.08), 0 0 20px rgba(0,200,255,0.1)"; }}
+          onBlur={e => { e.target.style.borderColor = "rgba(0,200,255,0.2)"; e.target.style.boxShadow = "none"; }}
         />
-        <Button
-          type="submit"
-          className="w-full bg-violet-600 hover:bg-violet-700"
-          disabled={loading || code.length !== 6}
-        >
+        <button type="submit" disabled={loading || code.length !== 6}
+          className="btn-magnetic w-full py-2.5 rounded-xl text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ color: "#020b18" }}>
           {loading ? "Verifying…" : "Verify code"}
-        </Button>
+        </button>
       </form>
 
       <div className="mt-4 text-center">
-        <button
-          onClick={handleResend}
-          disabled={countdown > 0 || resending}
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-violet-600 mx-auto transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        <button onClick={handleResend} disabled={countdown > 0 || resending}
+          className="flex items-center gap-1.5 text-sm mx-auto transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ color: "#475569" }}
+          onMouseEnter={e => { if (countdown === 0) (e.currentTarget as HTMLElement).style.color = "#00c8ff"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#475569"; }}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${resending ? "animate-spin" : ""}`} />
-          {countdown > 0 ? `Resend code in ${countdown}s` : "Resend code"}
+          {countdown > 0 ? `Resend in ${countdown}s` : "Resend code"}
         </button>
       </div>
 
-      <Link href="/login" className="flex items-center justify-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 mt-4 transition-colors">
+      <Link href="/login" className="flex items-center justify-center gap-1.5 text-sm mt-4 transition-colors"
+        style={{ color: "#334155" }}
+        onMouseEnter={e => (e.currentTarget.style.color = "#94a3b8")}
+        onMouseLeave={e => (e.currentTarget.style.color = "#334155")}
+      >
         <ArrowLeft className="w-3.5 h-3.5" />
         Back to login
       </Link>
@@ -112,17 +136,14 @@ function VerifyForm() {
 
 export default function VerifyOtpPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex items-center justify-center px-4 field-pattern" style={{ background: "#020b18" }}>
+      <div className="fixed top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full pointer-events-none" style={{ background: "rgba(0,200,255,0.04)", filter: "blur(80px)" }} />
+
+      <div className="w-full max-w-sm relative z-10">
         <div className="flex justify-center mb-8">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center">
-              <Zap className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-xl font-bold">Magnetize</span>
-          </Link>
+          <MagnetLogo />
         </div>
-        <Suspense fallback={<div className="bg-white rounded-2xl border p-8 h-72 animate-pulse" />}>
+        <Suspense fallback={<div className="rounded-2xl h-80 animate-pulse" style={{ background: "rgba(4,17,31,0.85)", border: "1px solid rgba(0,200,255,0.12)" }} />}>
           <VerifyForm />
         </Suspense>
       </div>

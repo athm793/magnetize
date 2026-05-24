@@ -2,11 +2,43 @@
 import { useEffect, useRef, useCallback } from "react";
 import * as THREE from "three";
 
+// Magnetic dipole field — moment along +Y axis
+function dipoleField(x: number, y: number, z: number): THREE.Vector3 {
+  const r2 = x * x + y * y + z * z;
+  if (r2 < 0.004) return new THREE.Vector3(0, 0, 0);
+  const r5 = Math.pow(r2, 2.5);
+  return new THREE.Vector3(
+    (3 * x * y) / r5,
+    (3 * y * y - r2) / r5,
+    (3 * z * y) / r5,
+  );
+}
+
+// Integrate a field line starting at (x0,y0,z0) following B direction
+function traceFieldLine(x0: number, y0: number, z0: number): THREE.Vector3[] {
+  const pts: THREE.Vector3[] = [];
+  let x = x0, y = y0, z = z0;
+  const POLE_Y = 1.6;
+  for (let i = 0; i < 400; i++) {
+    pts.push(new THREE.Vector3(x, y, z));
+    const b = dipoleField(x, y, z);
+    const len = b.length();
+    if (len < 0.00005) break;
+    const dt = 0.045;
+    x += (b.x / len) * dt;
+    y += (b.y / len) * dt;
+    z += (b.z / len) * dt;
+    if (x * x + y * y + z * z > 64) break;          // left the scene
+    if (y < -POLE_Y && x * x + z * z < 0.16) break; // reached S pole
+  }
+  return pts;
+}
+
 export default function Scene3D() {
   const mountRef = useRef<HTMLDivElement>(null);
   const mouseRef = useRef({ x: 0, y: 0 });
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+  const onMouseMove = useCallback((e: MouseEvent) => {
     mouseRef.current = {
       x: (e.clientX / window.innerWidth - 0.5) * 2,
       y: (e.clientY / window.innerHeight - 0.5) * 2,
@@ -17,202 +49,232 @@ export default function Scene3D() {
     const mount = mountRef.current;
     if (!mount) return;
 
-    // ── Scene ────────────────────────────────────────────────
+    // ── Core setup ──────────────────────────────────────────
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x05050f, 0.045);
+    scene.fog = new THREE.FogExp2(0x020b18, 0.038);
 
-    // ── Camera ───────────────────────────────────────────────
-    const camera = new THREE.PerspectiveCamera(55, mount.clientWidth / mount.clientHeight, 0.1, 100);
-    camera.position.set(0, 0.5, 11);
+    const camera = new THREE.PerspectiveCamera(48, mount.clientWidth / mount.clientHeight, 0.1, 100);
+    camera.position.set(0, 0, 10);
 
-    // ── Renderer ─────────────────────────────────────────────
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setSize(mount.clientWidth, mount.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setClearColor(0x05050f, 1);
+    renderer.setClearColor(0x020b18, 1);
     mount.appendChild(renderer.domElement);
 
+    // ── World group — rotates slowly as one unit ─────────────
+    const world = new THREE.Group();
+    scene.add(world);
+
     // ── Lights ───────────────────────────────────────────────
-    scene.add(new THREE.AmbientLight(0xffffff, 0.06));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.04));
 
-    const violetLight = new THREE.PointLight(0x7c3aed, 12, 25);
-    violetLight.position.set(-5, 5, 3);
-    scene.add(violetLight);
+    const nLight = new THREE.PointLight(0x60a5fa, 18, 9);
+    nLight.position.set(0, 1.8, 0);
+    world.add(nLight);
 
-    const blueLight = new THREE.PointLight(0x3b82f6, 6, 20);
-    blueLight.position.set(5, -3, -3);
-    scene.add(blueLight);
+    const sLight = new THREE.PointLight(0xf87171, 12, 9);
+    sLight.position.set(0, -1.8, 0);
+    world.add(sLight);
 
-    const pinkLight = new THREE.PointLight(0xa855f7, 5, 18);
-    pinkLight.position.set(0, 7, -5);
-    scene.add(pinkLight);
+    const rimA = new THREE.DirectionalLight(0x38bdf8, 0.6);
+    rimA.position.set(-4, 2, 4);
+    scene.add(rimA);
 
-    const rimLight = new THREE.DirectionalLight(0x60a5fa, 0.4);
-    rimLight.position.set(-3, 2, 5);
-    scene.add(rimLight);
+    const rimB = new THREE.DirectionalLight(0xfb7185, 0.4);
+    rimB.position.set(4, -2, -4);
+    scene.add(rimB);
 
-    // ── Central torus knot ───────────────────────────────────
-    const torusGeo = new THREE.TorusKnotGeometry(1.8, 0.5, 220, 24, 2, 3);
+    // ── Bar magnet ───────────────────────────────────────────
+    const POLE_Y = 1.6;
+    const R = 0.26;
 
-    const torusMat = new THREE.MeshPhongMaterial({
-      color: 0x5b21b6,
-      emissive: 0x2e1065,
-      emissiveIntensity: 0.4,
-      shininess: 120,
-      specular: new THREE.Color(0xa78bfa),
-      transparent: true,
-      opacity: 0.92,
+    // N pole cap glow disc
+    const diskGeo = new THREE.CircleGeometry(R * 1.6, 32);
+    const nDiskMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.35, side: THREE.DoubleSide });
+    const nDisk = new THREE.Mesh(diskGeo, nDiskMat);
+    nDisk.position.y = POLE_Y + 0.01;
+    nDisk.rotation.x = -Math.PI / 2;
+    world.add(nDisk);
+
+    const sDiskMat = new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.35, side: THREE.DoubleSide });
+    const sDisk = new THREE.Mesh(diskGeo.clone(), sDiskMat);
+    sDisk.position.y = -POLE_Y - 0.01;
+    sDisk.rotation.x = Math.PI / 2;
+    world.add(sDisk);
+
+    // N pole cylinder
+    const cylGeo = (h: number) => new THREE.CylinderGeometry(R, R, h, 40, 1);
+
+    const nMat = new THREE.MeshPhongMaterial({
+      color: 0x1e3a8a,
+      emissive: 0x1d4ed8,
+      emissiveIntensity: 0.55,
+      shininess: 140,
+      specular: new THREE.Color(0x93c5fd),
     });
-    const torus = new THREE.Mesh(torusGeo, torusMat);
-    scene.add(torus);
+    const nCyl = new THREE.Mesh(cylGeo(POLE_Y), nMat);
+    nCyl.position.y = POLE_Y / 2;
+    world.add(nCyl);
 
-    // Wireframe shell
-    const wireMat = new THREE.MeshBasicMaterial({
-      color: 0x8b5cf6,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.08,
+    const sMat = new THREE.MeshPhongMaterial({
+      color: 0x7f1d1d,
+      emissive: 0xdc2626,
+      emissiveIntensity: 0.55,
+      shininess: 140,
+      specular: new THREE.Color(0xfca5a5),
     });
-    const wire = new THREE.Mesh(torusGeo, wireMat);
-    scene.add(wire);
+    const sCyl = new THREE.Mesh(cylGeo(POLE_Y), sMat);
+    sCyl.position.y = -POLE_Y / 2;
+    world.add(sCyl);
 
-    // ── Particle field ───────────────────────────────────────
-    const COUNT = 3500;
-    const pos = new Float32Array(COUNT * 3);
-    const col = new Float32Array(COUNT * 3);
+    // Chrome equator band
+    const bandMat = new THREE.MeshPhongMaterial({
+      color: 0x94a3b8,
+      shininess: 300,
+      specular: new THREE.Color(0xffffff),
+    });
+    world.add(new THREE.Mesh(new THREE.CylinderGeometry(R + 0.025, R + 0.025, 0.1, 40), bandMat));
 
-    const c1 = new THREE.Color(0x7c3aed);
-    const c2 = new THREE.Color(0x60a5fa);
-    const c3 = new THREE.Color(0xffffff);
+    // Pole label halos (torus)
+    const nHalo = new THREE.Mesh(
+      new THREE.TorusGeometry(R + 0.07, 0.012, 8, 60),
+      new THREE.MeshBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending }),
+    );
+    nHalo.position.y = POLE_Y;
+    nHalo.rotation.x = Math.PI / 2;
+    world.add(nHalo);
 
-    for (let i = 0; i < COUNT; i++) {
-      const i3 = i * 3;
-      const r = 5 + Math.random() * 12;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      pos[i3]     = r * Math.sin(phi) * Math.cos(theta);
-      pos[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      pos[i3 + 2] = r * Math.cos(phi);
+    const sHalo = new THREE.Mesh(
+      new THREE.TorusGeometry(R + 0.07, 0.012, 8, 60),
+      new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending }),
+    );
+    sHalo.position.y = -POLE_Y;
+    sHalo.rotation.x = Math.PI / 2;
+    world.add(sHalo);
 
-      const t = Math.random();
-      const pc = t < 0.5
-        ? c1.clone().lerp(c2, t * 2)
-        : c2.clone().lerp(c3, (t - 0.5) * 2);
-      col[i3] = pc.r; col[i3 + 1] = pc.g; col[i3 + 2] = pc.b;
+    // ── Field lines ──────────────────────────────────────────
+    // 8 azimuthal × 2 elevation → 16 field lines
+    const N_AZ = 8;
+    const ELEVATIONS = [32, 62]; // degrees from Y axis
+    const R_START = 0.4;
+    const fieldLineCurves: THREE.CatmullRomCurve3[] = [];
+
+    for (let az = 0; az < N_AZ; az++) {
+      const phi = (az / N_AZ) * Math.PI * 2;
+      for (let ei = 0; ei < ELEVATIONS.length; ei++) {
+        const theta = (ELEVATIONS[ei] * Math.PI) / 180;
+        const x0 = R_START * Math.sin(theta) * Math.cos(phi);
+        const y0 = POLE_Y + R_START * Math.cos(theta);
+        const z0 = R_START * Math.sin(theta) * Math.sin(phi);
+        const pts = traceFieldLine(x0, y0, z0);
+        if (pts.length < 6) continue;
+        const curve = new THREE.CatmullRomCurve3(pts);
+        fieldLineCurves.push(curve);
+
+        const linePts = curve.getPoints(100);
+        const geo = new THREE.BufferGeometry().setFromPoints(linePts);
+        const mat = new THREE.LineBasicMaterial({
+          color: ei === 0 ? 0x00e5ff : 0x0ea5e9,
+          transparent: true,
+          opacity: ei === 0 ? 0.65 : 0.38,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        world.add(new THREE.Line(geo, mat));
+      }
     }
 
-    const ptGeo = new THREE.BufferGeometry();
-    ptGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    ptGeo.setAttribute("color", new THREE.BufferAttribute(col, 3));
-
-    const ptMat = new THREE.PointsMaterial({
+    // ── Flowing particles along field lines ──────────────────
+    const PER_LINE = 5;
+    const totalFlow = fieldLineCurves.length * PER_LINE;
+    const flowPos = new Float32Array(totalFlow * 3);
+    const flowGeo = new THREE.BufferGeometry();
+    flowGeo.setAttribute("position", new THREE.BufferAttribute(flowPos, 3));
+    const flowMat = new THREE.PointsMaterial({
+      color: 0x00e5ff,
       size: 0.07,
-      vertexColors: true,
       transparent: true,
-      opacity: 0.75,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
       sizeAttenuation: true,
     });
-    const particles = new THREE.Points(ptGeo, ptMat);
-    scene.add(particles);
+    const flowPoints = new THREE.Points(flowGeo, flowMat);
+    world.add(flowPoints);
 
-    // ── Floating orbs ────────────────────────────────────────
-    const orbGroup = new THREE.Group();
-    const orbData: { mesh: THREE.Mesh; baseY: number; phase: number }[] = [];
+    // Track t value per particle
+    const flowT = Array.from({ length: totalFlow }, (_, i) =>
+      (i % PER_LINE) / PER_LINE,
+    );
+    const flowSpeed = Array.from({ length: totalFlow }, () => 0.0016 + Math.random() * 0.001);
 
-    const orbDefs = [
-      { p: [-3.5, 2.5, -2], s: 0.18, c: 0xa855f7 },
-      { p: [3.5, -2,   -3], s: 0.14, c: 0x60a5fa },
-      { p: [-4.5, -2.5, 1], s: 0.12, c: 0x7c3aed },
-      { p: [4.2,  3.2,  2], s: 0.16, c: 0xa78bfa },
-      { p: [-2.2, 4.5, -1], s: 0.13, c: 0x818cf8 },
-      { p: [2.5,  -4.5, 0], s: 0.15, c: 0x60a5fa },
-      { p: [-4.2, 0.5,  3], s: 0.11, c: 0xc4b5fd },
-      { p: [4.5,  0.5, -4], s: 0.14, c: 0x7c3aed },
-      { p: [0.5,  4,    4], s: 0.10, c: 0xa855f7 },
-      { p: [-0.5, -4,  -2], s: 0.12, c: 0x60a5fa },
-      { p: [3,    1.5, -5], s: 0.09, c: 0xc4b5fd },
-      { p: [-3,  -1.5,  5], s: 0.10, c: 0x818cf8 },
-    ];
-
-    orbDefs.forEach(({ p, s, c }, i) => {
-      const geo = new THREE.SphereGeometry(s, 20, 20);
-      const mat = new THREE.MeshPhongMaterial({
-        color: c,
-        emissive: c,
-        emissiveIntensity: 0.6,
-        shininess: 80,
-        transparent: true,
-        opacity: 0.9,
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(p[0], p[1], p[2]);
-      orbGroup.add(mesh);
-      orbData.push({ mesh, baseY: p[1], phase: i * 0.63 });
-    });
-    scene.add(orbGroup);
-
-    // Connecting lines between adjacent orbs
-    const lineMat = new THREE.LineBasicMaterial({
-      color: 0x6d28d9,
-      transparent: true,
-      opacity: 0.12,
-    });
-    for (let i = 0; i < orbDefs.length; i++) {
-      const a = new THREE.Vector3(...(orbDefs[i].p as [number, number, number]));
-      const b = new THREE.Vector3(...(orbDefs[(i + 3) % orbDefs.length].p as [number, number, number]));
-      const lineGeo = new THREE.BufferGeometry().setFromPoints([a, b]);
-      scene.add(new THREE.Line(lineGeo, lineMat));
+    // ── Iron filing ambient particles ─────────────────────────
+    const FILING_N = 900;
+    const filingPos = new Float32Array(FILING_N * 3);
+    const filingCol = new Float32Array(FILING_N * 3);
+    for (let i = 0; i < FILING_N; i++) {
+      const r = 3 + Math.random() * 6;
+      const t = Math.random() * Math.PI * 2;
+      const p = Math.acos(2 * Math.random() - 1);
+      filingPos[i * 3]     = r * Math.sin(p) * Math.cos(t);
+      filingPos[i * 3 + 1] = r * Math.sin(p) * Math.sin(t);
+      filingPos[i * 3 + 2] = r * Math.cos(p);
+      // Color: mix between blue and silver
+      const mix = Math.random();
+      filingCol[i * 3]     = 0.58 * mix + 0.35;
+      filingCol[i * 3 + 1] = 0.80 * mix + 0.15;
+      filingCol[i * 3 + 2] = 1.0;
     }
+    const filingGeo = new THREE.BufferGeometry();
+    filingGeo.setAttribute("position", new THREE.BufferAttribute(filingPos, 3));
+    filingGeo.setAttribute("color", new THREE.BufferAttribute(filingCol, 3));
+    scene.add(new THREE.Points(filingGeo, new THREE.PointsMaterial({
+      vertexColors: true,
+      size: 0.025,
+      transparent: true,
+      opacity: 0.3,
+      sizeAttenuation: true,
+    })));
 
-    // ── Ring halo around torus ───────────────────────────────
-    const ringGeo = new THREE.TorusGeometry(3.2, 0.015, 8, 120);
-    const ringMat = new THREE.MeshBasicMaterial({ color: 0x7c3aed, transparent: true, opacity: 0.25 });
-    const ring1 = new THREE.Mesh(ringGeo, ringMat);
-    ring1.rotation.x = Math.PI / 2;
-    scene.add(ring1);
-
-    const ring2 = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.01, 8, 120), new THREE.MeshBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.12 }));
-    ring2.rotation.x = Math.PI / 3;
-    ring2.rotation.y = Math.PI / 6;
-    scene.add(ring2);
-
-    // ── Animation ────────────────────────────────────────────
+    // ── Animation ─────────────────────────────────────────────
     let animId: number;
     let time = 0;
-    let camX = 0, camY = 0.5;
+    let camX = 0, camY = 0;
 
     function animate() {
       animId = requestAnimationFrame(animate);
       time += 0.005;
 
-      // Torus rotation
-      torus.rotation.x = time * 0.25;
-      torus.rotation.y = time * 0.38;
-      wire.rotation.x = torus.rotation.x;
-      wire.rotation.y = torus.rotation.y;
+      // Slow Y-rotation of whole scene
+      world.rotation.y = time * 0.18;
 
-      // Particle drift
-      particles.rotation.y = time * 0.04;
-      particles.rotation.x = Math.sin(time * 0.07) * 0.15;
+      // Update flow particles
+      for (let i = 0; i < totalFlow; i++) {
+        const lineIdx = Math.floor(i / PER_LINE);
+        flowT[i] = (flowT[i] + flowSpeed[i]) % 1;
+        const p = fieldLineCurves[lineIdx].getPoint(flowT[i]);
+        flowPos[i * 3]     = p.x;
+        flowPos[i * 3 + 1] = p.y;
+        flowPos[i * 3 + 2] = p.z;
+      }
+      flowGeo.attributes.position.needsUpdate = true;
 
-      // Orb float
-      orbData.forEach(({ mesh, baseY, phase }) => {
-        mesh.position.y = baseY + Math.sin(time * 1.2 + phase) * 0.18;
-      });
+      // Pulse pole lights
+      nLight.intensity = 18 + Math.sin(time * 2.2) * 5;
+      sLight.intensity = 12 + Math.cos(time * 1.9) * 4;
 
-      // Ring rotation
-      ring1.rotation.z = time * 0.15;
-      ring2.rotation.z = -time * 0.10;
-      ring2.rotation.y = time * 0.08;
+      // Pulse halos
+      nHalo.scale.setScalar(1 + Math.sin(time * 3) * 0.06);
+      sHalo.scale.setScalar(1 + Math.cos(time * 3.3) * 0.06);
+      (nHalo.material as THREE.MeshBasicMaterial).opacity = 0.55 + Math.sin(time * 2) * 0.25;
+      (sHalo.material as THREE.MeshBasicMaterial).opacity = 0.55 + Math.cos(time * 2.4) * 0.25;
+      (nDiskMat).opacity = 0.2 + Math.sin(time * 2) * 0.12;
+      (sDiskMat).opacity = 0.2 + Math.cos(time * 2.3) * 0.12;
 
-      // Pulsing lights
-      violetLight.intensity = 12 + Math.sin(time * 1.8) * 3;
-      blueLight.intensity   =  6 + Math.cos(time * 1.3) * 1.5;
-      pinkLight.intensity   =  5 + Math.sin(time * 2.1 + 1) * 1.5;
-
-      // Camera parallax — smooth damp toward mouse
-      camX += (mouseRef.current.x * 1.8 - camX) * 0.03;
-      camY += (0.5 - mouseRef.current.y * 1.0 - camY) * 0.03;
+      // Mouse parallax on camera (smooth damp)
+      camX += (mouseRef.current.x * 2.5 - camX) * 0.03;
+      camY += (-mouseRef.current.y * 1.5 - camY) * 0.03;
       camera.position.x = camX;
       camera.position.y = camY;
       camera.lookAt(0, 0, 0);
@@ -221,7 +283,6 @@ export default function Scene3D() {
     }
     animate();
 
-    // ── Resize ───────────────────────────────────────────────
     function onResize() {
       if (!mount) return;
       camera.aspect = mount.clientWidth / mount.clientHeight;
@@ -230,16 +291,16 @@ export default function Scene3D() {
     }
 
     window.addEventListener("resize", onResize);
-    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mousemove", onMouseMove);
 
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener("resize", onResize);
-      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mousemove", onMouseMove);
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
       renderer.dispose();
     };
-  }, [handleMouseMove]);
+  }, [onMouseMove]);
 
   return <div ref={mountRef} className="w-full h-full" />;
 }

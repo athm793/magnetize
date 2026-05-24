@@ -136,15 +136,9 @@ export default function LandingPage() {
           </div>
         </nav>
 
-        {/* ── Hero — 100vh, transparent, 3D shows through ──── */}
+        {/* ── Hero — 100vh, fully transparent, 3D shows through ── */}
         <section className="relative flex items-center justify-center overflow-hidden"
           style={{ height: "100vh" }}>
-          {/* Radial vignette so text pops against the 3D */}
-          <div className="absolute inset-0 pointer-events-none"
-            style={{ background: "radial-gradient(ellipse 80% 65% at 50% 50%, transparent 15%, rgba(2,11,24,0.45) 60%, rgba(2,11,24,0.9) 100%)" }} />
-          {/* Bottom fade into next section */}
-          <div className="absolute bottom-0 left-0 right-0 h-40 pointer-events-none"
-            style={{ background: "linear-gradient(to top, #020b18, transparent)" }} />
 
           <div className="relative z-10 text-center px-6 max-w-3xl mx-auto pt-14">
             {/* Animated status badge */}
@@ -202,7 +196,7 @@ export default function LandingPage() {
         <div style={{ height: "3rem" }} />
 
         {/* ── Features section ──────────────────────────────── */}
-        <section style={{ background: "rgba(2,11,24,0.88)", backdropFilter: "blur(1px)" }}>
+        <section style={{ background: "rgba(2,11,24,0.55)" }}>
           <div className="max-w-6xl mx-auto px-6 py-24">
 
             {/* Section header */}
@@ -262,7 +256,7 @@ export default function LandingPage() {
         <div style={{ height: "2rem" }} />
 
         {/* ── Self-host CTA ─────────────────────────────────── */}
-        <section style={{ background: "rgba(2,11,24,0.85)", backdropFilter: "blur(1px)" }}>
+        <section style={{ background: "rgba(2,11,24,0.5)" }}>
           <div className="max-w-5xl mx-auto px-6 pb-24 pt-4">
 
             {/* SVG field line divider */}

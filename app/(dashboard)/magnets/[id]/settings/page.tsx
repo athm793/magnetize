@@ -34,22 +34,25 @@ export default function MagnetSettingsPage() {
 
   useEffect(() => {
     fetch(`/api/magnets/${params.id}`)
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error("Failed to load magnet"); return r.json(); })
       .then(data => {
         setMagnet(data.magnet);
         setGates(data.gates ?? []);
         setPrimaryColor(data.magnet.settings?.primaryColor ?? "#7c3aed");
         setBgColor(data.magnet.settings?.bgColor ?? "#ffffff");
         setLoading(false);
-      });
+      })
+      .catch(() => { toast.error("Failed to load settings"); setLoading(false); });
     fetch(`/api/integrations?magnetId=${params.id}`)
-      .then(r => r.json())
+      .then(r => { if (!r.ok) return []; return r.json(); })
       .then(integrations => {
+        if (!Array.isArray(integrations)) return;
         const zapier = integrations.find((i: { type: string }) => i.type === "zapier");
         const rb2b = integrations.find((i: { type: string }) => i.type === "rb2b");
         if (zapier) setZapierUrl((zapier.config as { webhookUrl: string }).webhookUrl ?? "");
         if (rb2b) setRb2bPixel((rb2b.config as { pixelId: string }).pixelId ?? "");
-      });
+      })
+      .catch(() => {});
   }, [params.id]);
 
   async function saveBranding() {

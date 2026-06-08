@@ -1,4 +1,5 @@
 import sql from "../client";
+import crypto from "crypto";
 
 export interface OtpCode {
   id: string;
@@ -13,7 +14,7 @@ export async function createOtp(email: string): Promise<string> {
   // Invalidate any existing unused codes for this email
   await sql`UPDATE otp_codes SET used = TRUE WHERE email = ${email} AND used = FALSE`;
 
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const code = String(crypto.randomInt(100000, 1000000)).padStart(6, "0");
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 min
 
   await sql`

@@ -34,11 +34,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json(tab, { status: 201 });
   }
   if (body.action === "updateTab") {
-    const tab = await updateTab(body.tabId, { title: body.title, content: body.content, order: body.order });
+    const tab = await updateTab(body.tabId, { title: body.title, content: body.content, order: body.order }, id);
+    if (!tab) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(tab);
   }
   if (body.action === "deleteTab") {
-    await deleteTab(body.tabId);
+    const deleted = await deleteTab(body.tabId, id);
+    if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ ok: true });
   }
   if (body.action === "reorderTabs") {
@@ -52,11 +54,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json(gate, { status: 201 });
   }
   if (body.action === "updateGate") {
-    const gate = await updateGate(body.gateId, { type: body.type, triggerConfig: body.triggerConfig, formFields: body.formFields, active: body.active });
+    const gate = await updateGate(body.gateId, { type: body.type, triggerConfig: body.triggerConfig, formFields: body.formFields, active: body.active }, id);
+    if (!gate) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(gate);
   }
   if (body.action === "deleteGate") {
-    await deleteGate(body.gateId);
+    const deleted = await deleteGate(body.gateId, id);
+    if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json({ ok: true });
   }
 

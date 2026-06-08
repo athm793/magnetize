@@ -58,7 +58,8 @@ export async function createGate(data: {
 
 export async function updateGate(
   id: string,
-  data: Partial<{ type: string; triggerConfig: TriggerConfig; formFields: FormField[]; active: boolean }>
+  data: Partial<{ type: string; triggerConfig: TriggerConfig; formFields: FormField[]; active: boolean }>,
+  magnetId: string
 ): Promise<Gate | null> {
   const rows = await sql`
     UPDATE gates SET
@@ -66,13 +67,13 @@ export async function updateGate(
       trigger_config = CASE WHEN ${data.triggerConfig !== undefined} THEN ${JSON.stringify(data.triggerConfig ?? {})}::jsonb ELSE trigger_config END,
       form_fields = CASE WHEN ${data.formFields !== undefined} THEN ${JSON.stringify(data.formFields ?? [])}::jsonb ELSE form_fields END,
       active = COALESCE(${data.active ?? null}, active)
-    WHERE id = ${id}
+    WHERE id = ${id} AND magnet_id = ${magnetId}
     RETURNING *
   `;
   return (rows[0] as Gate) ?? null;
 }
 
-export async function deleteGate(id: string): Promise<boolean> {
-  const rows = await sql`DELETE FROM gates WHERE id = ${id} RETURNING id`;
+export async function deleteGate(id: string, magnetId: string): Promise<boolean> {
+  const rows = await sql`DELETE FROM gates WHERE id = ${id} AND magnet_id = ${magnetId} RETURNING id`;
   return rows.length > 0;
 }

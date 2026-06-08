@@ -32,26 +32,28 @@ export async function createTab(data: {
 
 export async function updateTab(
   id: string,
-  data: Partial<{ title: string; order: number; content: unknown[] }>
+  data: Partial<{ title: string; order: number; content: unknown[] }>,
+  magnetId: string
 ): Promise<Tab | null> {
   const rows = await sql`
     UPDATE tabs SET
       title = COALESCE(${data.title ?? null}, title),
       "order" = COALESCE(${data.order ?? null}, "order"),
       content = CASE WHEN ${data.content !== undefined} THEN ${JSON.stringify(data.content ?? [])}::jsonb ELSE content END
-    WHERE id = ${id}
+    WHERE id = ${id} AND magnet_id = ${magnetId}
     RETURNING *
   `;
   return (rows[0] as Tab) ?? null;
 }
 
-export async function deleteTab(id: string): Promise<boolean> {
-  const rows = await sql`DELETE FROM tabs WHERE id = ${id} RETURNING id`;
+export async function deleteTab(id: string, magnetId: string): Promise<boolean> {
+  const rows = await sql`DELETE FROM tabs WHERE id = ${id} AND magnet_id = ${magnetId} RETURNING id`;
   return rows.length > 0;
 }
 
 export async function reorderTabs(tabs: { id: string; order: number }[]): Promise<void> {
-  for (const tab of tabs) {
-    await sql`UPDATE tabs SET "order" = ${tab.order} WHERE id = ${tab.id}`;
-  }
+  if (tabs.length === 0) return;
+  await Promise.all(
+    tabs.map((tab) => sql`UPDATE tabs SET "order" = ${tab.order} WHERE id = ${tab.id}`)
+  );
 }

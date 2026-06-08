@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 import { getDomainsByUser, createDomain, deleteDomain, verifyDomain, updateDomainMagnet } from "@/lib/db/queries/domains";
+import { getMagnetById } from "@/lib/db/queries/magnets";
 import dns from "dns/promises";
 
 export async function GET() {
@@ -44,6 +45,15 @@ export async function PATCH(req: Request) {
   }
 
   if (action === "assignMagnet") {
+    // Verify domain ownership
+    const domains = await getDomainsByUser(session.user.id);
+    const domain = domains.find((d) => d.id === id);
+    if (!domain) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    // Verify magnet ownership if one is being assigned
+    if (magnetId) {
+      const magnet = await getMagnetById(magnetId, session.user.id);
+      if (!magnet) return NextResponse.json({ error: "Magnet not found" }, { status: 404 });
+    }
     await updateDomainMagnet(id, magnetId ?? null);
     return NextResponse.json({ ok: true });
   }

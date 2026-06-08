@@ -22,14 +22,11 @@ export async function POST(req: Request) {
 
   const template = templateId ? getTemplate(templateId) : null;
   if (template && template.tabs.length > 0) {
-    for (let i = 0; i < template.tabs.length; i++) {
-      await createTab({
-        magnetId: magnet.id,
-        title: template.tabs[i].title,
-        order: i,
-        content: template.tabs[i].content as unknown[],
-      });
-    }
+    await Promise.all(
+      template.tabs.map((tab, i) =>
+        createTab({ magnetId: magnet.id, title: tab.title, order: i, content: tab.content as unknown[] })
+      )
+    );
   } else {
     await createTab({ magnetId: magnet.id, title: "Introduction", order: 0 });
   }

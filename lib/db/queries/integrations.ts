@@ -47,10 +47,22 @@ export async function upsertIntegration(data: {
   return rows[0] as Integration;
 }
 
-export async function toggleIntegration(id: string, active: boolean): Promise<void> {
-  await sql`UPDATE integrations SET active = ${active} WHERE id = ${id}`;
+export async function toggleIntegration(id: string, active: boolean, userId: string): Promise<boolean> {
+  const rows = await sql`
+    UPDATE integrations i SET active = ${active}
+    FROM lead_magnets lm
+    WHERE i.id = ${id} AND i.magnet_id = lm.id AND lm.user_id = ${userId}
+    RETURNING i.id
+  `;
+  return rows.length > 0;
 }
 
-export async function deleteIntegration(id: string): Promise<void> {
-  await sql`DELETE FROM integrations WHERE id = ${id}`;
+export async function deleteIntegration(id: string, userId: string): Promise<boolean> {
+  const rows = await sql`
+    DELETE FROM integrations i
+    USING lead_magnets lm
+    WHERE i.id = ${id} AND i.magnet_id = lm.id AND lm.user_id = ${userId}
+    RETURNING i.id
+  `;
+  return rows.length > 0;
 }

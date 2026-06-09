@@ -66,3 +66,7 @@ export async function deleteIntegration(id: string, userId: string): Promise<boo
   `;
   return rows.length > 0;
 }
+
+export async function updateIntegrationConfig(id: string, config: IntegrationConfig): Promise<void> {
+  await sql`UPDATE integrations SET config = ${JSON.stringify(config)}::jsonb WHERE id = ${id}`;
+}

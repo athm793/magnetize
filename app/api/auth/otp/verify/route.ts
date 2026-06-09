@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyOtp } from "@/lib/db/queries/otp";
 import { upsertOAuthUser } from "@/lib/db/queries/users";
-import { signIn } from "@/auth";
 
 export async function POST(req: Request) {
   const { email, code } = await req.json();

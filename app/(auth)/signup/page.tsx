@@ -44,6 +44,8 @@ export default function SignupPage() {
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+
+    // Create the account
     const res = await fetch("/api/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -55,13 +57,28 @@ export default function SignupPage() {
       setLoading(false);
       return;
     }
-    const signInRes = await signIn("credentials", { email, password, redirect: false });
-    if (signInRes?.error) {
-      toast.error("Account created but sign-in failed. Please log in.");
-      setLoading(false);
-      return;
+
+    // Send a verification code before signing in
+    const otpRes = await fetch("/api/auth/otp/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    setLoading(false);
+
+    if (otpRes.ok) {
+      toast.success("Account created! Check your email for a verification code.");
+      router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
+    } else {
+      // OTP send failed — fall back to direct sign-in so the user isn't blocked
+      const signInRes = await signIn("credentials", { email, password, redirect: false });
+      if (signInRes?.error) {
+        toast.error("Account created. Please sign in.");
+        router.push("/login");
+      } else {
+        router.push("/dashboard");
+      }
     }
-    router.push("/dashboard");
   }
 
   async function handleGoogle() {

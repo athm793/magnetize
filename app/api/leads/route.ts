@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createLead } from "@/lib/db/queries/leads";
 import { trackEvent } from "@/lib/db/queries/analytics";
 import { getGatesByMagnet } from "@/lib/db/queries/gates";
-import { getIntegrationsByMagnet } from "@/lib/db/queries/integrations";
+import { getIntegrationsByMagnet, updateIntegrationConfig, type GoogleSheetsConfig } from "@/lib/db/queries/integrations";
 import { getMagnetById } from "@/lib/db/queries/magnets";
 
 async function fireZapierWebhook(webhookUrl: string, payload: Record<string, unknown>) {
@@ -15,25 +15,52 @@ async function fireZapierWebhook(webhookUrl: string, payload: Record<string, unk
   } catch {}
 }
 
-async function appendToGoogleSheets(config: { spreadsheetId: string; sheetName: string; accessToken: string }, row: string[]) {
+async function appendToGoogleSheets(integrationId: string, config: GoogleSheetsConfig, row: string[]) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}/values/${encodeURIComponent(config.sheetName)}:append?valueInputOption=USER_ENTERED`;
+  const requestBody = JSON.stringify({ values: [row] });
+
+  const doAppend = (token: string) =>
+    fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: requestBody,
+    });
+
   try {
-    await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}/values/${encodeURIComponent(config.sheetName)}:append?valueInputOption=USER_ENTERED`,
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${config.accessToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ values: [row] }),
-      }
-    );
-  } catch {}
+    let res = await doAppend(config.accessToken);
+
+    if (res.status === 401 && config.refreshToken) {
+      // Access token expired — use the refresh token to get a new one
+      const { OAuth2Client } = await import("google-auth-library");
+      const oauth2 = new OAuth2Client(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET
+      );
+      oauth2.setCredentials({ refresh_token: config.refreshToken });
+      const { credentials } = await oauth2.refreshAccessToken();
+      const newAccessToken = credentials.access_token;
+      if (!newAccessToken) return;
+
+      // Persist the new token so future calls don't repeat the refresh
+      const updatedConfig: GoogleSheetsConfig = { ...config, accessToken: newAccessToken };
+      await updateIntegrationConfig(integrationId, updatedConfig);
+
+      // Retry with fresh token
+      res = await doAppend(newAccessToken);
+    }
+  } catch {
+    // Integration failures must not block lead capture
+  }
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(req: Request) {
   const body = await req.json();
   const { magnetId, gateId, email, name, data = {} } = body;
 
-  if (!magnetId || !email) {
-    return NextResponse.json({ error: "magnetId and email required" }, { status: 400 });
+  if (!magnetId || !email || !EMAIL_RE.test(email)) {
+    return NextResponse.json({ error: "Valid magnetId and email required" }, { status: 400 });
   }
 
   const magnet = await getMagnetById(magnetId);
@@ -55,9 +82,9 @@ export async function POST(req: Request) {
       }
     }
     if (integration.type === "google_sheets") {
-      const cfg = integration.config as { spreadsheetId: string; sheetName: string; accessToken: string };
+      const cfg = integration.config as GoogleSheetsConfig;
       const row = [new Date().toISOString(), email, name ?? "", ...Object.values(data)];
-      await appendToGoogleSheets(cfg, row);
+      await appendToGoogleSheets(integration.id, cfg, row);
     }
   }
 

@@ -136,6 +136,16 @@ function LoginForm() {
             className="btn-magnetic w-full py-2.5 rounded-xl text-sm font-bold mt-1" style={{ color: "#020b18" }}>
             {loading ? "Signing in…" : "Sign in"}
           </button>
+          <div className="text-center pt-1">
+            <button type="button" onClick={() => setTab("code")}
+              className="text-xs transition-colors"
+              style={{ color: "#334155" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "#00c8ff")}
+              onMouseLeave={e => (e.currentTarget.style.color = "#334155")}
+            >
+              Forgot password? Use email code instead →
+            </button>
+          </div>
         </form>
       ) : (
         <form onSubmit={handleSendCode} className="space-y-3">

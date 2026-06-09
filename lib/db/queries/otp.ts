@@ -10,6 +10,15 @@ export interface OtpCode {
   created_at: string;
 }
 
+export async function countRecentOtps(email: string, windowMinutes = 60): Promise<number> {
+  const rows = await sql`
+    SELECT COUNT(*) AS cnt FROM otp_codes
+    WHERE email = ${email}
+      AND created_at > NOW() - (${windowMinutes} || ' minutes')::interval
+  `;
+  return Number((rows[0] as { cnt: string }).cnt);
+}
+
 export async function createOtp(email: string): Promise<string> {
   // Invalidate any existing unused codes for this email
   await sql`UPDATE otp_codes SET used = TRUE WHERE email = ${email} AND used = FALSE`;

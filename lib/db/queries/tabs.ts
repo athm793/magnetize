@@ -51,9 +51,9 @@ export async function deleteTab(id: string, magnetId: string): Promise<boolean> 
   return rows.length > 0;
 }
 
-export async function reorderTabs(tabs: { id: string; order: number }[]): Promise<void> {
+export async function reorderTabs(magnetId: string, tabs: { id: string; order: number }[]): Promise<void> {
   if (tabs.length === 0) return;
   await Promise.all(
-    tabs.map((tab) => sql`UPDATE tabs SET "order" = ${tab.order} WHERE id = ${tab.id}`)
+    tabs.map((tab) => sql`UPDATE tabs SET "order" = ${tab.order} WHERE id = ${tab.id} AND magnet_id = ${magnetId}`)
   );
 }

@@ -35,6 +35,20 @@ function VerifyForm() {
     return () => clearInterval(t);
   }, []);
 
+  if (!email) {
+    return (
+      <div className="rounded-2xl p-8 text-center" style={{ background: "rgba(4,17,31,0.85)", border: "1px solid rgba(0,200,255,0.12)", backdropFilter: "blur(16px)" }}>
+        <h1 className="text-xl font-bold mb-2" style={{ color: "#e8f4ff" }}>Missing email</h1>
+        <p className="text-sm mb-6" style={{ color: "#475569" }}>
+          We couldn&apos;t find an email to verify. Please sign up or log in again to receive a new code.
+        </p>
+        <Link href="/login" className="btn-magnetic inline-block w-full py-2.5 rounded-xl text-sm font-bold" style={{ color: "#020b18" }}>
+          Back to login
+        </Link>
+      </div>
+    );
+  }
+
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault();
     if (code.length !== 6) { toast.error("Enter the 6-digit code"); return; }

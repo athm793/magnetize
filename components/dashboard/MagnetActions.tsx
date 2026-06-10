@@ -28,7 +28,10 @@ export default function MagnetActions({ magnetId, magnetTitle }: { magnetId: str
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent transition-colors">
+        <DropdownMenuTrigger
+          className="inline-flex h-11 w-11 items-center justify-center rounded-md hover:bg-accent transition-colors"
+          aria-label={`More actions for "${magnetTitle}"`}
+        >
           <MoreHorizontal className="w-3.5 h-3.5" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">

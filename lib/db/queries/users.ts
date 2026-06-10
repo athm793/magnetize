@@ -10,7 +10,7 @@ export interface User {
 }
 
 export async function getUserByEmail(email: string): Promise<User | null> {
-  const rows = await sql`SELECT * FROM users WHERE email = ${email} LIMIT 1`;
+  const rows = await sql`SELECT * FROM users WHERE email = ${email.toLowerCase().trim()} LIMIT 1`;
   return (rows[0] as User) ?? null;
 }
 
@@ -27,7 +27,7 @@ export async function createUser(data: {
 }): Promise<User> {
   const rows = await sql`
     INSERT INTO users (email, name, image, password_hash)
-    VALUES (${data.email}, ${data.name ?? null}, ${data.image ?? null}, ${data.password_hash ?? null})
+    VALUES (${data.email.toLowerCase().trim()}, ${data.name ?? null}, ${data.image ?? null}, ${data.password_hash ?? null})
     RETURNING *
   `;
   return rows[0] as User;
@@ -40,7 +40,7 @@ export async function upsertOAuthUser(data: {
 }): Promise<User> {
   const rows = await sql`
     INSERT INTO users (email, name, image)
-    VALUES (${data.email}, ${data.name ?? null}, ${data.image ?? null})
+    VALUES (${data.email.toLowerCase().trim()}, ${data.name ?? null}, ${data.image ?? null})
     ON CONFLICT (email) DO UPDATE SET
       name = COALESCE(EXCLUDED.name, users.name),
       image = COALESCE(EXCLUDED.image, users.image)

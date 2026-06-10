@@ -20,7 +20,8 @@ export const proxy = auth((req) => {
   }
 
   const isPublic =
-    publicPaths.some((p) => pathname.startsWith(p)) ||
+    pathname === "/" ||
+    publicPaths.slice(1).some((p) => pathname.startsWith(p)) ||
     publicApiPaths.some((p) => pathname.startsWith(p));
 
   if (!isPublic && !req.auth) {

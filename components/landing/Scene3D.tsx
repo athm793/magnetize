@@ -446,7 +446,24 @@ export default function Scene3D() {
 
       renderer.render(scene, camera);
     }
-    animate();
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (prefersReducedMotion) {
+      // Render a single static frame instead of looping
+      renderer.render(scene, camera);
+    } else {
+      animate();
+    }
+
+    function onVisibilityChange() {
+      if (document.hidden) {
+        cancelAnimationFrame(animId);
+      } else if (!prefersReducedMotion) {
+        animate();
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     function onResize() {
       if (!mount) return;
@@ -459,6 +476,7 @@ export default function Scene3D() {
 
     return () => {
       cancelAnimationFrame(animId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("mousemove", onMouseMove);
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);

@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { getIntegrationsByMagnet, upsertIntegration, toggleIntegration, deleteIntegration } from "@/lib/db/queries/integrations";
 import { getMagnetById } from "@/lib/db/queries/magnets";
 
+const RB2B_PIXEL_RE = /^[A-Za-z0-9_-]+$/;
+
 export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -20,6 +22,9 @@ export async function POST(req: Request) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { magnetId, type, config } = await req.json();
   if (!magnetId || !type || !config) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+  if (type === "rb2b" && !RB2B_PIXEL_RE.test((config as { pixelId?: string }).pixelId ?? "")) {
+    return NextResponse.json({ error: "Invalid RB2B pixel ID — letters, numbers, hyphens and underscores only" }, { status: 400 });
+  }
   const magnet = await getMagnetById(magnetId, session.user.id);
   if (!magnet) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const integration = await upsertIntegration({ magnetId, type, config });

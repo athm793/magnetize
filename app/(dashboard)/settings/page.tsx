@@ -5,18 +5,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Plus, Trash2, CheckCircle, Clock, ExternalLink } from "lucide-react";
 import type { Domain } from "@/lib/db/queries/domains";
+import type { LeadMagnet } from "@/lib/db/queries/magnets";
 
 export default function SettingsPage() {
   const [domains, setDomains] = useState<Domain[]>([]);
+  const [magnets, setMagnets] = useState<LeadMagnet[]>([]);
   const [newDomain, setNewDomain] = useState("");
   const [adding, setAdding] = useState(false);
   const [verifying, setVerifying] = useState<string | null>(null);
+  const [assigning, setAssigning] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/domains").then(r => r.json()).then(setDomains);
+    fetch("/api/magnets").then(r => r.json()).then(setMagnets);
   }, []);
 
   async function addDomain() {
@@ -57,13 +62,33 @@ export default function SettingsPage() {
   }
 
   async function removeDomain(id: string) {
-    await fetch("/api/domains", {
+    const res = await fetch("/api/domains", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
-    setDomains(prev => prev.filter(d => d.id !== id));
-    toast.success("Domain removed");
+    if (res.ok) {
+      setDomains(prev => prev.filter(d => d.id !== id));
+      toast.success("Domain removed");
+    } else {
+      toast.error("Failed to remove domain");
+    }
+  }
+
+  async function assignMagnet(id: string, magnetId: string) {
+    setAssigning(id);
+    const res = await fetch("/api/domains", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, action: "assignMagnet", magnetId: magnetId === "none" ? null : magnetId }),
+    });
+    setAssigning(null);
+    if (res.ok) {
+      setDomains(prev => prev.map(d => d.id === id ? { ...d, magnet_id: magnetId === "none" ? null : magnetId } : d));
+      toast.success("Domain updated");
+    } else {
+      toast.error("Failed to update domain");
+    }
   }
 
   return (
@@ -122,6 +147,27 @@ export default function SettingsPage() {
                         <code className="text-xs text-amber-900 break-all">{domain.txt_record}</code>
                       </div>
                     )}
+                    <div className="mt-2 flex items-center gap-2">
+                      <Label className="text-xs text-gray-500 shrink-0">Points to</Label>
+                      <Select
+                        value={domain.magnet_id ?? "none"}
+                        onValueChange={(v) => assignMagnet(domain.id, v ?? "none")}
+                        disabled={assigning === domain.id}
+                      >
+                        <SelectTrigger className="h-7 text-xs w-48">
+                          <SelectValue placeholder="No magnet assigned" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No magnet assigned</SelectItem>
+                          {magnets.map(m => (
+                            <SelectItem key={m.id} value={m.id}>{m.title}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {!domain.verified && domain.magnet_id && (
+                      <p className="text-xs text-gray-400 mt-1">Will go live once this domain is verified.</p>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {!domain.verified && (
@@ -136,8 +182,8 @@ export default function SettingsPage() {
                       </Button>
                     )}
                     {domain.verified && (
-                      <a href={`https://${domain.domain}`} target="_blank" rel="noopener">
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                      <a href={`https://${domain.domain}`} target="_blank" rel="noopener" aria-label={`Open ${domain.domain} in a new tab`}>
+                        <Button variant="ghost" size="sm" className="h-11 w-11 p-0">
                           <ExternalLink className="w-3.5 h-3.5" />
                         </Button>
                       </a>
@@ -146,7 +192,8 @@ export default function SettingsPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => removeDomain(domain.id)}
-                      className="h-7 w-7 p-0 text-red-400 hover:text-red-600"
+                      aria-label={`Remove domain ${domain.domain}`}
+                      className="h-11 w-11 p-0 text-red-400 hover:text-red-600"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>

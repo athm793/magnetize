@@ -44,7 +44,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ ok: true });
   }
   if (body.action === "reorderTabs") {
-    await reorderTabs(body.tabs);
+    await reorderTabs(id, body.tabs);
     return NextResponse.json({ ok: true });
   }
 

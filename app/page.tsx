@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
@@ -64,6 +64,16 @@ const STACK = [
 ];
 
 export default function LandingPage() {
+  const [isAuthed, setIsAuthed] = useState(false);
+
+  // Check auth state for nav/footer CTAs
+  useEffect(() => {
+    fetch("/api/auth/session")
+      .then(r => r.json())
+      .then(data => setIsAuthed(!!data?.user))
+      .catch(() => setIsAuthed(false));
+  }, []);
+
   // Scroll-reveal via IntersectionObserver
   useEffect(() => {
     const els = document.querySelectorAll(".reveal");
@@ -120,18 +130,29 @@ export default function LandingPage() {
                 <GithubIcon className="w-4 h-4" />
                 <span className="hidden sm:inline">GitHub</span>
               </a>
-              <Link href="/login">
-                <button className="text-sm px-3 py-1.5 rounded-lg transition-all"
-                  style={{ color: "#94a3b8" }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#e8f4ff"; (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#94a3b8"; (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-                >Sign in</button>
-              </Link>
-              <Link href="/signup">
-                <button className="btn-north text-sm px-4 py-1.5 rounded-lg font-semibold">
-                  Get started free
-                </button>
-              </Link>
+              {isAuthed ? (
+                <Link href="/dashboard">
+                  <button className="btn-north text-xs sm:text-sm px-3 sm:px-4 py-1.5 rounded-lg font-semibold whitespace-nowrap">
+                    Dashboard
+                  </button>
+                </Link>
+              ) : (
+                <>
+                  <Link href="/login">
+                    <button className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 rounded-lg transition-all whitespace-nowrap"
+                      style={{ color: "#94a3b8" }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#e8f4ff"; (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#94a3b8"; (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                    >Sign in</button>
+                  </Link>
+                  <Link href="/signup">
+                    <button className="btn-north text-xs sm:text-sm px-3 sm:px-4 py-1.5 rounded-lg font-semibold whitespace-nowrap">
+                      <span className="sm:hidden">Get started</span>
+                      <span className="hidden sm:inline">Get started free</span>
+                    </button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </nav>
@@ -374,18 +395,29 @@ export default function LandingPage() {
                 onMouseEnter={e => (e.currentTarget.style.color = "#94a3b8")}
                 onMouseLeave={e => (e.currentTarget.style.color = "#334155")}
               >GitHub</a>
-              <Link href="/login"
-                className="transition-colors"
-                style={{ color: "#334155" }}
-                onMouseEnter={e => (e.currentTarget.style.color = "#94a3b8")}
-                onMouseLeave={e => (e.currentTarget.style.color = "#334155")}
-              >Sign in</Link>
-              <Link href="/signup"
-                className="transition-colors"
-                style={{ color: "#334155" }}
-                onMouseEnter={e => (e.currentTarget.style.color = "#94a3b8")}
-                onMouseLeave={e => (e.currentTarget.style.color = "#334155")}
-              >Sign up</Link>
+              {isAuthed ? (
+                <Link href="/dashboard"
+                  className="transition-colors"
+                  style={{ color: "#334155" }}
+                  onMouseEnter={e => (e.currentTarget.style.color = "#94a3b8")}
+                  onMouseLeave={e => (e.currentTarget.style.color = "#334155")}
+                >Dashboard</Link>
+              ) : (
+                <>
+                  <Link href="/login"
+                    className="transition-colors"
+                    style={{ color: "#334155" }}
+                    onMouseEnter={e => (e.currentTarget.style.color = "#94a3b8")}
+                    onMouseLeave={e => (e.currentTarget.style.color = "#334155")}
+                  >Sign in</Link>
+                  <Link href="/signup"
+                    className="transition-colors"
+                    style={{ color: "#334155" }}
+                    onMouseEnter={e => (e.currentTarget.style.color = "#94a3b8")}
+                    onMouseLeave={e => (e.currentTarget.style.color = "#334155")}
+                  >Sign up</Link>
+                </>
+              )}
             </div>
           </div>
         </footer>

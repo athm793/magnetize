@@ -5,7 +5,7 @@ export function SignOutButton() {
   return (
     <button
       type="submit"
-      className="flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded-lg transition-all"
+      className="flex items-center gap-2 w-full min-h-[44px] px-2 text-xs rounded-lg transition-all"
       style={{ color: "#475569" }}
       onMouseEnter={e => {
         (e.currentTarget as HTMLElement).style.color = "#e8f4ff";

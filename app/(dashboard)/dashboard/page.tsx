@@ -63,24 +63,24 @@ export default async function DashboardPage() {
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {magnet.status === "published" && (
-                  <a href={`/p/${magnet.slug}`} target="_blank" rel="noopener">
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <a href={`/p/${magnet.slug}`} target="_blank" rel="noopener" aria-label={`View "${magnet.title}" live page`}>
+                    <Button variant="ghost" size="sm" className="h-11 w-11 p-0">
                       <ExternalLink className="w-3.5 h-3.5" />
                     </Button>
                   </a>
                 )}
-                <Link href={`/magnets/${magnet.id}/analytics`}>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Link href={`/magnets/${magnet.id}/analytics`} aria-label={`View analytics for "${magnet.title}"`}>
+                  <Button variant="ghost" size="sm" className="h-11 w-11 p-0">
                     <BarChart2 className="w-3.5 h-3.5" />
                   </Button>
                 </Link>
-                <Link href={`/magnets/${magnet.id}/settings`}>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Link href={`/magnets/${magnet.id}/settings`} aria-label={`Open settings for "${magnet.title}"`}>
+                  <Button variant="ghost" size="sm" className="h-11 w-11 p-0">
                     <Settings className="w-3.5 h-3.5" />
                   </Button>
                 </Link>
                 <Link href={`/magnets/${magnet.id}/editor`}>
-                  <Button size="sm" variant="outline" className="h-8 text-xs">Edit</Button>
+                  <Button size="sm" variant="outline" className="h-11 text-xs">Edit</Button>
                 </Link>
                 <MagnetActions magnetId={magnet.id} magnetTitle={magnet.title} />
               </div>

@@ -58,7 +58,17 @@ CREATE TABLE users (
   email TEXT UNIQUE NOT NULL,
   name TEXT,
   image TEXT,
-  password TEXT,
+  password_hash TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE otp_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL,
+  code TEXT NOT NULL,
+  used BOOLEAN NOT NULL DEFAULT false,
+  attempts INT NOT NULL DEFAULT 0,
+  expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

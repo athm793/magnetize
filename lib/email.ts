@@ -10,7 +10,7 @@ export async function sendOtpEmail(email: string, code: string): Promise<void> {
   }
 
   await resend.emails.send({
-    from: "Magnetize <noreply@magnetize.app>",
+    from: "Magnetize <onboarding@resend.dev>",
     to: email,
     subject: `Your Magnetize login code: ${code}`,
     html: `

@@ -7,15 +7,35 @@ import "@blocknote/mantine/style.css";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Save, Plus, X, GripVertical, ExternalLink, Globe } from "lucide-react";
-import type { Tab } from "@/lib/db/queries/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sparkles, Save, Plus, X, GripVertical, ExternalLink, PlayCircle, FileText, Code } from "lucide-react";
+import type { Tab, TabType, EmbedData } from "@/lib/db/queries/tabs";
 import type { LeadMagnet } from "@/lib/db/queries/magnets";
 
 interface Props {
   magnet: LeadMagnet;
   tabs: Tab[];
   hasAI?: boolean;
+}
+
+const TAB_TYPE_ICONS: Record<TabType, React.ReactNode> = {
+  blocks:  <FileText className="w-3 h-3" />,
+  youtube: <PlayCircle className="w-3 h-3" />,
+  file:    <FileText className="w-3 h-3" />,
+  embed:   <Code className="w-3 h-3" />,
+};
+
+function extractYouTubeId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+  ];
+  for (const p of patterns) {
+    const m = url.match(p);
+    if (m) return m[1];
+  }
+  return null;
 }
 
 export default function MagnetEditor({ magnet, tabs: initialTabs, hasAI }: Props) {
@@ -31,7 +51,11 @@ export default function MagnetEditor({ magnet, tabs: initialTabs, hasAI }: Props
   const [renamingTabId, setRenamingTabId] = useState<string | null>(null);
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Embed editor state (YouTube URL / file URL / HTML code)
+  const [embedDraft, setEmbedDraft] = useState<Record<string, string>>({});
+
   const activeTab = tabs.find((t) => t.id === activeTabId);
+  const activeType = activeTab?.tab_type ?? "blocks";
 
   const editor = useCreateBlockNote({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,12 +63,21 @@ export default function MagnetEditor({ magnet, tabs: initialTabs, hasAI }: Props
   });
 
   useEffect(() => {
-    if (!activeTab) return;
+    if (!activeTab || activeTab.tab_type !== "blocks") return;
     editor.replaceBlocks(
       editor.document,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       activeTab.content?.length ? (activeTab.content as any) : [{ type: "paragraph", content: "" }]
     );
+  }, [activeTabId]);
+
+  // Keep embed draft in sync when switching tabs
+  useEffect(() => {
+    if (!activeTab) return;
+    const d = activeTab.embed_data ?? {};
+    if (activeTab.tab_type === "youtube") setEmbedDraft(prev => ({ ...prev, [activeTabId]: d.videoId ? `https://youtu.be/${d.videoId}` : "" }));
+    if (activeTab.tab_type === "file")    setEmbedDraft(prev => ({ ...prev, [activeTabId]: d.fileUrl ?? "" }));
+    if (activeTab.tab_type === "embed")   setEmbedDraft(prev => ({ ...prev, [activeTabId]: d.code ?? "" }));
   }, [activeTabId]);
 
   const scheduleTabSave = useCallback(() => {
@@ -58,6 +91,42 @@ export default function MagnetEditor({ magnet, tabs: initialTabs, hasAI }: Props
       });
     }, 1500);
   }, [activeTabId, magnet.id, editor]);
+
+  async function changeTabType(tabId: string, tabType: TabType) {
+    await fetch(`/api/magnets/${magnet.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "updateTab", tabId, tabType, embedData: {} }),
+    });
+    setTabs(prev => prev.map(t => t.id === tabId ? { ...t, tab_type: tabType, embed_data: {} } : t));
+    setEmbedDraft(prev => ({ ...prev, [tabId]: "" }));
+  }
+
+  async function saveEmbedData(tabId: string, tabType: TabType, draft: string) {
+    let embedData: EmbedData = {};
+
+    if (tabType === "youtube") {
+      const videoId = extractYouTubeId(draft);
+      if (!videoId) { toast.error("Paste a valid YouTube URL"); return; }
+      embedData = { videoId };
+    } else if (tabType === "file") {
+      if (!draft.trim()) { toast.error("Paste a file URL"); return; }
+      const lower = draft.toLowerCase();
+      const fileType = lower.endsWith(".pdf") ? "pdf" : lower.endsWith(".docx") ? "docx" : lower.endsWith(".txt") ? "txt" : "pdf";
+      embedData = { fileUrl: draft.trim(), fileType, fileName: draft.split("/").pop() };
+    } else if (tabType === "embed") {
+      if (!draft.trim()) { toast.error("Paste your embed code"); return; }
+      embedData = { code: draft.trim() };
+    }
+
+    await fetch(`/api/magnets/${magnet.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "updateTab", tabId, embedData }),
+    });
+    setTabs(prev => prev.map(t => t.id === tabId ? { ...t, embed_data: embedData } : t));
+    toast.success("Saved");
+  }
 
   async function saveMagnet() {
     setSaving(true);
@@ -145,7 +214,6 @@ export default function MagnetEditor({ magnet, tabs: initialTabs, hasAI }: Props
           let payload: { done?: boolean; tabs?: { title: string; content: unknown[] }[]; chunk?: string; error?: string };
           try { payload = JSON.parse(line.slice(6)); } catch { continue; }
           if (payload.done && payload.tabs) {
-            // Replace all tabs with generated ones
             const generatedTabs = payload.tabs as { title: string; content: unknown[] }[];
             const updatedTabs: Tab[] = [];
             for (let i = 0; i < generatedTabs.length; i++) {
@@ -183,6 +251,8 @@ export default function MagnetEditor({ magnet, tabs: initialTabs, hasAI }: Props
       setAiGenerating(false);
     }
   }
+
+  const draftValue = embedDraft[activeTabId] ?? "";
 
   return (
     <div className="flex flex-col h-screen bg-white">
@@ -252,19 +322,17 @@ export default function MagnetEditor({ magnet, tabs: initialTabs, hasAI }: Props
               <button
                 onClick={() => setActiveTabId(tab.id)}
                 onDoubleClick={() => setRenamingTabId(tab.id)}
-                className={`flex items-center gap-1 text-sm px-3 py-1.5 rounded-md transition-colors ${
+                className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md transition-colors ${
                   activeTabId === tab.id
                     ? "bg-white border border-gray-200 text-gray-900 font-medium shadow-sm"
                     : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                 }`}
               >
                 <GripVertical className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100" />
+                <span className="text-gray-400">{TAB_TYPE_ICONS[tab.tab_type ?? "blocks"]}</span>
                 {tab.title}
                 {activeTabId === tab.id && tabs.length > 1 && (
-                  <X
-                    className="w-3 h-3 text-gray-400 hover:text-red-500 ml-1"
-                    onClick={e => { e.stopPropagation(); deleteTab(tab.id); }}
-                  />
+                  <X className="w-3 h-3 text-gray-400 hover:text-red-500 ml-1" onClick={e => { e.stopPropagation(); deleteTab(tab.id); }} />
                 )}
               </button>
             )}
@@ -276,15 +344,112 @@ export default function MagnetEditor({ magnet, tabs: initialTabs, hasAI }: Props
         </button>
       </div>
 
-      {/* Editor */}
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-3xl mx-auto py-10 px-8">
-          <BlockNoteView
-            editor={editor}
-            onChange={scheduleTabSave}
-            theme="light"
-          />
+      {/* Tab type selector (shown below tab bar for active tab) */}
+      {activeTab && (
+        <div className="flex items-center gap-3 px-6 py-2 border-b border-gray-100 bg-gray-50 shrink-0">
+          <span className="text-xs text-gray-400">Tab type:</span>
+          <Select value={activeType} onValueChange={v => changeTabType(activeTab.id, v as TabType)}>
+            <SelectTrigger className="h-7 w-40 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="blocks">Rich text (BlockNote)</SelectItem>
+              <SelectItem value="youtube">YouTube video</SelectItem>
+              <SelectItem value="file">File (PDF / DOCX / TXT)</SelectItem>
+              <SelectItem value="embed">HTML / iframe / JS embed</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-gray-300">Double-click a tab name to rename it</span>
         </div>
+      )}
+
+      {/* Content area */}
+      <div className="flex-1 overflow-auto">
+        {activeType === "blocks" && (
+          <div className="max-w-3xl mx-auto py-10 px-8">
+            <BlockNoteView editor={editor} onChange={scheduleTabSave} theme="light" />
+          </div>
+        )}
+
+        {activeType === "youtube" && (
+          <div className="max-w-3xl mx-auto py-10 px-8">
+            <p className="text-sm font-medium text-gray-700 mb-3">YouTube video</p>
+            <div className="flex gap-2 mb-6">
+              <Input
+                placeholder="Paste YouTube URL (e.g. https://youtu.be/abc123)"
+                value={draftValue}
+                onChange={e => setEmbedDraft(prev => ({ ...prev, [activeTabId]: e.target.value }))}
+                className="text-sm"
+              />
+              <Button size="sm" onClick={() => saveEmbedData(activeTabId, "youtube", draftValue)} className="bg-violet-600 hover:bg-violet-700 shrink-0">
+                Save
+              </Button>
+            </div>
+            {activeTab?.embed_data?.videoId && (
+              <div className="aspect-video rounded-xl overflow-hidden border border-gray-200">
+                <iframe
+                  src={`https://www.youtube.com/embed/${activeTab.embed_data.videoId}`}
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeType === "file" && (
+          <div className="max-w-3xl mx-auto py-10 px-8">
+            <p className="text-sm font-medium text-gray-700 mb-2">File URL</p>
+            <p className="text-xs text-gray-400 mb-3">Paste a direct URL to a PDF, DOCX, or TXT file. Upload to Google Drive, Dropbox, or any CDN first.</p>
+            <div className="flex gap-2 mb-6">
+              <Input
+                placeholder="https://example.com/file.pdf"
+                value={draftValue}
+                onChange={e => setEmbedDraft(prev => ({ ...prev, [activeTabId]: e.target.value }))}
+                className="text-sm"
+              />
+              <Button size="sm" onClick={() => saveEmbedData(activeTabId, "file", draftValue)} className="bg-violet-600 hover:bg-violet-700 shrink-0">
+                Save
+              </Button>
+            </div>
+            {activeTab?.embed_data?.fileUrl && (
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-sm text-gray-600">
+                <span className="font-medium">Linked file:</span>{" "}
+                <a href={activeTab.embed_data.fileUrl} target="_blank" rel="noopener" className="text-violet-600 hover:underline">
+                  {activeTab.embed_data.fileName ?? activeTab.embed_data.fileUrl}
+                </a>
+                {" "}
+                <span className="text-xs text-gray-400 uppercase">({activeTab.embed_data.fileType})</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeType === "embed" && (
+          <div className="max-w-3xl mx-auto py-10 px-8">
+            <p className="text-sm font-medium text-gray-700 mb-2">HTML / iframe / JS embed</p>
+            <p className="text-xs text-gray-400 mb-3">Paste any iframe, script tag, or raw HTML. This renders directly on the public page.</p>
+            <Textarea
+              placeholder={'<iframe src="https://..." width="100%" height="500"></iframe>'}
+              value={draftValue}
+              onChange={e => setEmbedDraft(prev => ({ ...prev, [activeTabId]: e.target.value }))}
+              className="font-mono text-xs min-h-[160px] mb-3"
+            />
+            <Button size="sm" onClick={() => saveEmbedData(activeTabId, "embed", draftValue)} className="bg-violet-600 hover:bg-violet-700">
+              Save embed
+            </Button>
+            {activeTab?.embed_data?.code && (
+              <div className="mt-6">
+                <p className="text-xs text-gray-400 mb-2">Preview</p>
+                <div
+                  className="border border-gray-200 rounded-xl p-4 bg-gray-50 overflow-auto"
+                  dangerouslySetInnerHTML={{ __html: activeTab.embed_data.code }}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

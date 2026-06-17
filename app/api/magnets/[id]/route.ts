@@ -34,7 +34,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json(tab, { status: 201 });
   }
   if (body.action === "updateTab") {
-    const tab = await updateTab(body.tabId, { title: body.title, content: body.content, order: body.order }, id);
+    const tab = await updateTab(
+      body.tabId,
+      { title: body.title, content: body.content, order: body.order, tabType: body.tabType, embedData: body.embedData },
+      id
+    );
     if (!tab) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(tab);
   }

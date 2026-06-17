@@ -1,12 +1,19 @@
 import sql from "../client";
 
+export type FieldType = "text" | "email" | "tel" | "url" | "linkedin" | "select";
+
 export interface FormField {
   name: string;
-  type: "text" | "email" | "tel" | "select";
+  type: FieldType;
   required: boolean;
   label: string;
   placeholder?: string;
   options?: string[];
+  // Per-field validation config
+  validation?: {
+    noPersonalEmail?: boolean;   // block @gmail/@yahoo/etc
+    defaultCountryCode?: string; // e.g. "+1"
+  };
 }
 
 export interface TriggerConfig {
@@ -41,7 +48,14 @@ export async function createGate(data: {
   formFields?: FormField[];
 }): Promise<Gate> {
   const defaultFields: FormField[] = [
-    { name: "email", type: "email", required: true, label: "Email address", placeholder: "you@company.com" }
+    {
+      name: "email",
+      type: "email",
+      required: true,
+      label: "Work email",
+      placeholder: "you@company.com",
+      validation: { noPersonalEmail: true },
+    },
   ];
   const rows = await sql`
     INSERT INTO gates (magnet_id, type, trigger_config, form_fields)

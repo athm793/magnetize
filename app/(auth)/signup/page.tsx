@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -52,6 +51,7 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
 
+    // Create the account
     const res = await fetch("/api/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -65,15 +65,20 @@ export default function SignupPage() {
       return;
     }
 
-    // Account created — sign in immediately, no email verification step
-    const signInRes = await signIn("credentials", { email, password, redirect: false });
+    // Send verification code
+    const otpRes = await fetch("/api/auth/otp/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
     setLoading(false);
 
-    if (signInRes?.error) {
-      toast.error("Account created. Please sign in.");
-      router.push("/login");
+    if (otpRes.ok) {
+      toast.success("Account created! Check your email for a verification code.");
+      router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
     } else {
-      router.push("/dashboard");
+      toast.error("Account created but couldn't send verification email. Please sign in.");
+      router.push("/login");
     }
   }
 
